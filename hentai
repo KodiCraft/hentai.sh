@@ -1,0 +1,98 @@
+#!/bin/bash
+# Initialize a couple of variable defaults
+
+# The subreddit that we will read from, hentai by default
+SUBREDDIT="${SUBREDDIT:-hentai}"
+# The download location of our images if we do want to download
+DOWNLOAD_LOCATION="${HENTAI_DIRECTORY:-$HOME/Pictures/hentai}"
+# The cache folder where we will store the json we scraped
+CACHE="${HENTAI_CACHE:-$HOME/.cache/hentai}"
+# The image (.png, .jpg, .jpeg, .webp, .avif) viewer of our choice. Default is feh
+IMAGE_VIEWER="${IMAGE_VIEWER:-feh -.}"
+# The video/animated (.mp4, .mov, .gif, .webm) viewer of our choice. Default is mpv
+VIDEO_VIEWER="${VIDEO_VIEWER:-mpv --loop}"
+# The amount of minutes we expect our cached data to last. Default is 30 minutes
+CACHE_LIFETIME="${CACHE_LIFETIME:-30}"
+
+# For simplicity, alias curla to curl with some nice defaults
+function curla() {
+    curl -A 'hentai.sh (like gecko and webkit and chromium but not at all actually lmao nerd get scraped)' -s --output - "$*"
+}
+
+# Before we start, make sure the above values are valid
+# Check if the download location directory exists. If not, create it
+if [ ! -d "$DOWNLOAD_LOCATION" ]; then
+    mkdir -p "$DOWNLOAD_LOCATION"
+fi
+# Check if the cache directory exists. If not, create it
+if [ ! -d "$CACHE" ]; then
+    mkdir -p "$CACHE"
+fi
+
+
+# The path of the Json file that will cache the results of our request
+CACHE_FILE="$CACHE/$SUBREDDIT.json"
+# Create the URL of our request
+REQ_URL="https://www.reddit.com/r/$SUBREDDIT.json"
+
+# Check if the cache file doesn't exist or if it is older than the cache lifetime. If so, we need to scrape the data again
+if [ ! -f "$CACHE_FILE" ] || [ $(find "$CACHE_FILE" -mmin +$CACHE_LIFETIME) ]; then
+    # Scrape the data from the subreddit
+    curla "$REQ_URL" > "$CACHE_FILE"
+fi 
+
+# Read the data into a variable
+DATA=$(cat "$CACHE_FILE")
+
+# Get the total length of the array we got back
+LENGTH=$(echo "$DATA" | jq '.data.children | length')
+
+# Set our index at 0, we will increment this as the user advances
+INDEX=0
+
+function next() {
+    # This function takes no arguments and increments the index by 1
+    ((INDEX++))
+}
+
+function open_index() {
+    # This function gets the URL of the image at the current index and opens it
+    URL=$(echo "$DATA" | jq .data.children[$INDEX].data.url | sed 's/"//g')
+    TITLE=$(echo "$DATA" | jq .data.children[$INDEX].data.title | sed 's/"//g')
+    echo $TITLE
+    echo $URL
+    
+    # Set the place where we will download the file, in $DOWNLOAD_LOCATION if we want to download it, in /tmp/ if not
+    if [ ! -z $HENTAI_DOWNLOAD ]; then
+        DOWNLOAD_LOCATION="$DOWNLOAD_LOCATION"
+    else
+        DOWNLOAD_LOCATION="/tmp/"
+    fi
+
+    # Get the extension of the file we are downloading
+    EXTENSION=$(echo "$URL" | sed 's/^.*\.//')
+
+    # Check if a file at that location already exists. If so, we don't want to download it again
+    if [ ! -f "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" ]; then
+        # Download the file
+        curl -s -o "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" "$URL"
+    fi
+    # Get the program we want to use based on the extension
+    if [ "$EXTENSION" == "png" ] || [ "$EXTENSION" == "jpg" ] || [ "$EXTENSION" == "jpeg" ] || [ "$EXTENSION" == "webp" ] || [ "$EXTENSION" == "avif" ]; then
+        $IMAGE_VIEWER "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" &
+    elif [ "$EXTENSION" == "mp4" ] || [ "$EXTENSION" == "mov" ] || [ "$EXTENSION" == "gif" ] || [ "$EXTENSION" == "webm" ]; then
+        $VIDEO_VIEWER "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" &
+    else
+        echo "This is not a valid file!!"
+    fi
+
+    # Wait until the program is closed before we move on to the next image
+    wait $!
+}
+
+# Loop until either our index hit the end of the array or the user stops the script
+# Every time in this loop, open the image then increment the index
+while [ "$INDEX" -lt "$LENGTH" ]; do
+    open_index
+    next
+done
