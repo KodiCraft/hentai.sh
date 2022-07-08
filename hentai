@@ -33,7 +33,7 @@ fi
 # The path of the Json file that will cache the results of our request
 CACHE_FILE="$CACHE/$SUBREDDIT.json"
 # Create the URL of our request
-REQ_URL="https://www.reddit.com/r/$SUBREDDIT.json"
+REQ_URL="https://www.reddit.com/r/$SUBREDDIT.json?limit=100"
 
 # Check if the cache file doesn't exist or if it is older than the cache lifetime. If so, we need to scrape the data again
 if [ ! -f "$CACHE_FILE" ] || [ $(find "$CACHE_FILE" -mmin +$CACHE_LIFETIME) ]; then
@@ -96,3 +96,5 @@ while [ "$INDEX" -lt "$LENGTH" ]; do
     open_index
     next
 done
+
+echo "Finished! $INDEX images seen"
