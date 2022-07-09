@@ -59,8 +59,10 @@ function open_index() {
     # This function gets the URL of the image at the current index and opens it
     URL=$(echo "$DATA" | jq .data.children[$INDEX].data.url | sed 's/"//g')
     TITLE=$(echo "$DATA" | jq .data.children[$INDEX].data.title | sed 's/"//g')
+    POST=$(echo "$DATA" | jq .data.children[$INDEX].data.permalink | sed 's/"//g')
     echo $TITLE
     echo $URL
+    echo $POST
     
     # Set the place where we will download the file, in $DOWNLOAD_LOCATION if we want to download it, in /tmp/ if not
     if [ ! -z $HENTAI_DOWNLOAD ]; then
