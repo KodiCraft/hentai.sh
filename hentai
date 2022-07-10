@@ -38,7 +38,7 @@ REQ_URL="https://www.reddit.com/r/$SUBREDDIT.json?limit=100"
 # Check if the cache file doesn't exist or if it is older than the cache lifetime. If so, we need to scrape the data again
 if [ ! -f "$CACHE_FILE" ] || [ $(find "$CACHE_FILE" -mmin +$CACHE_LIFETIME) ]; then
     # Scrape the data from the subreddit
-    curla "$REQ_URL" > "$CACHE_FILE"
+    curl -A 'hentai.sh (like gecko and webkit and chromium but not at all actually lmao nerd get scraped)' -# "$REQ_URL" -o "$CACHE_FILE"
 fi 
 
 # Read the data into a variable
@@ -55,11 +55,28 @@ function next() {
     ((INDEX++))
 }
 
+function parse_redgifs() {
+    # This function takes a redgifs URL then scrapes the data and returns the direct link to the image
+    # The URL is passed as an argument
+    URL=$(curla "$1" | grep -oP '"[^"]*?\.mp4"' | awk 'NR==1{print $1}' | sed 's/"//g')
+    
+}
+
 function open_index() {
     # This function gets the URL of the image at the current index and opens it
     URL=$(echo "$DATA" | jq .data.children[$INDEX].data.url | sed 's/"//g')
+
+    # Check if the URL is a redgifs URL
+    if [[ "$URL" == *"redgifs.com"* ]]; then
+        # If it is, we need to scrape the data and get the direct link to the image
+        parse_redgifs "$URL"
+        URL="$URL"
+    fi
+
     TITLE=$(echo "$DATA" | jq .data.children[$INDEX].data.title | sed 's/"//g')
-    POST=$(echo "$DATA" | jq .data.children[$INDEX].data.permalink | sed 's/"//g')
+    POST=https://reddit.com$(echo "$DATA" | jq .data.children[$INDEX].data.permalink | sed 's/"//g')
+
+    echo "============================================================"
     echo $TITLE
     echo $URL
     echo $POST
@@ -77,12 +94,12 @@ function open_index() {
     # Check if a file at that location already exists. If so, we don't want to download it again
     if [ ! -f "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" ]; then
         # Download the file
-        curl -s -o "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" "$URL"
+        curl -# -o "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" "$URL"
     fi
     # Get the program we want to use based on the extension
     if [ "$EXTENSION" == "png" ] || [ "$EXTENSION" == "jpg" ] || [ "$EXTENSION" == "jpeg" ] || [ "$EXTENSION" == "webp" ] || [ "$EXTENSION" == "avif" ]; then
         $IMAGE_VIEWER "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" &
-    elif [ "$EXTENSION" == "mp4" ] || [ "$EXTENSION" == "mov" ] || [ "$EXTENSION" == "gif" ] || [ "$EXTENSION" == "webm" ]; then
+    elif [ "$EXTENSION" == "mp4" ] || [ "$EXTENSION" == "mov" ] || [ "$EXTENSION" == "gif" ] || [ "$EXTENSION" == "webm" ] || [ "$EXTENSION" == "gifv" ]; then
         $VIDEO_VIEWER "$DOWNLOAD_LOCATION/$TITLE.$EXTENSION" &
     else
         echo "This is not a valid file!!"
